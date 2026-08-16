@@ -1,0 +1,121 @@
+# EditorConfig — https://editorconfig.org
+root = true
+
+# 모든 파일 공통
+[*]
+indent_style = space
+indent_size = 4
+tab_width = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# 마크업/설정류는 2칸
+[*.{json,yml,yaml,xml,csproj,props,targets,slnx}]
+indent_size = 2
+
+# C# 파일
+[*.cs]
+
+#### using 정리
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# IDE 전용. warning 지정 시 빌드가 GenerateDocumentationFile 활성화를 요구하므로 suggestion
+dotnet_diagnostic.IDE0005.severity = suggestion
+
+#### namespace
+csharp_style_namespace_declarations = file_scoped:warning
+
+#### var 선호 (모던 C# 스타일)
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+#### 표현식 본문 멤버
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_indexers = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+
+#### 중괄호 / using 문
+csharp_prefer_braces = when_multiline:warning
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_using_directive_placement = outside_namespace:warning
+
+#### Null 안전 / 단순화
+dotnet_style_coalesce_expression = true:warning                 # x ?? y
+dotnet_style_null_propagation = true:warning                    # x?.Y
+csharp_style_prefer_not_pattern = true:warning                  # is not null
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+csharp_style_conditional_delegate_call = true:suggestion
+
+#### 패턴 매칭 / switch 식
+csharp_style_prefer_switch_expression = true:warning
+csharp_style_prefer_pattern_matching = true:warning
+
+#### 모던 C# 식
+csharp_style_inlined_variable_declaration = true:warning        # int.TryParse(s, out var x)
+
+#### 컬렉션 표현식: Array.Empty<T>() / new[]{...} → [] / [...] (C# 12+)
+dotnet_style_prefer_collection_expression = when_types_loosely_match:warning
+
+#### 비활성화한 자동 변환
+dotnet_diagnostic.IDE0057.severity = none   # Substring → arr[1..3] 변환은 사용 안 함
+dotnet_diagnostic.IDE0290.severity = none   # Primary constructor 변환은 사용 안 함
+dotnet_diagnostic.IDE0305.severity = none   # LINQ fluent 끝의 .ToList()/.ToArray() → [.. ...] 변환은 사용 안 함
+dotnet_diagnostic.IDE0270.severity = none   # if (x == null) throw ... → x ?? throw ... 변환은 사용 안 함
+dotnet_diagnostic.IDE0078.severity = none   # x == A || x == B → x is A or B 같은 결합 패턴 변환은 사용 안 함
+dotnet_diagnostic.IDE0031.severity = none   # x == null ? null : x.Y → x?.Y 변환은 사용 안 함 (LINQ expression tree에서 CS8072)
+
+#### readonly / 접근 제어
+dotnet_style_readonly_field = true:warning              # 가능하면 readonly
+
+#### 사용 안 함 진단
+dotnet_diagnostic.IDE0051.severity = suggestion         # private 멤버 미사용
+dotnet_diagnostic.IDE0052.severity = suggestion         # private 쓰이지 않는 set
+dotnet_diagnostic.CA1822.severity = suggestion          # 멤버를 static으로
+
+#### 이름 규칙 (naming)
+# 인터페이스: IPascalCase
+dotnet_naming_rule.interfaces_should_be_prefixed.severity = warning
+dotnet_naming_rule.interfaces_should_be_prefixed.symbols = interface_symbols
+dotnet_naming_rule.interfaces_should_be_prefixed.style = interface_style
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbols.applicable_accessibilities = *
+dotnet_naming_style.interface_style.capitalization = pascal_case
+dotnet_naming_style.interface_style.required_prefix = I
+
+# 필드 규칙은 위에서부터 먼저 일치하는 것 하나만 적용. 좁은 조건이 앞.
+# const: PascalCase
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_rule.constants_pascal.symbols = constant_symbols
+dotnet_naming_rule.constants_pascal.style = pascal_style
+dotnet_naming_symbols.constant_symbols.applicable_kinds = field
+dotnet_naming_symbols.constant_symbols.required_modifiers = const
+dotnet_naming_style.pascal_style.capitalization = pascal_case
+
+# private static readonly: PascalCase. 값이 고정이라 const에 준하는 취급
+dotnet_naming_rule.private_static_readonly_pascal.severity = warning
+dotnet_naming_rule.private_static_readonly_pascal.symbols = private_static_readonly_fields
+dotnet_naming_rule.private_static_readonly_pascal.style = pascal_style
+dotnet_naming_symbols.private_static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_readonly_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_readonly_fields.required_modifiers = static,readonly
+
+# private 인스턴스 필드: _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _
+
+# 비동기 메서드: ~Async 접미사
+dotnet_naming_rule.async_methods_suffix.severity = suggestion
+dotnet_naming_rule.async_methods_suffix.symbols = async_methods
+dotnet_naming_rule.async_methods_suffix.style = async_style
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.async_style.capitalization = pascal_case
+dotnet_naming_style.async_style.required_suffix = Async

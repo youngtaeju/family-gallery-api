@@ -1,0 +1,6 @@
+@FamilyGallery.Api_HostAddress = http://localhost:5088
+
+GET {{FamilyGallery.Api_HostAddress}}/health
+Accept: application/json
+
+###
