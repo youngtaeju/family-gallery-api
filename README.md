@@ -7,8 +7,6 @@
 - 외부 노출은 Cloudflare Tunnel 단일 경로
 - 클라이언트는 Flutter 앱(`family-gallery-app`) 단독
 
-설계 전반은 [CLAUDE.md](./CLAUDE.md) 참조. 아래는 현재 구현된 범위만 다룬다.
-
 ## 요구 사항
 
 - .NET SDK 10.0
@@ -26,6 +24,7 @@ FamilyGallery.Api/
   Data/               AppDbContext, Entities
   Migrations/         EF Core 마이그레이션
   Endpoints/          엔드포인트 매핑 확장 메서드
+  Cli/                계정 관리 명령
 Dockerfile
 docker-compose.yml    NAS 배포용
 ```
@@ -36,6 +35,34 @@ docker-compose.yml    NAS 배포용
 - 인가 fallback policy 적용. 전 엔드포인트 인증 필수가 기본값
 - 익명 허용은 `/health`, 개발용 OpenAPI 문서뿐
 - 권한은 `User.Role`의 `Viewer` / `Editor` 2종. 조회 범위는 권한과 무관하게 동일하고, 업로드·삭제만 `Editor`로 제한
+
+## 사용자 관리
+
+계정 생성·권한 변경은 CLI로만 수행. 관리용 HTTP 엔드포인트 미제공.
+
+```
+user list
+user add <username> --display-name <표시 이름> [--role viewer|editor]
+user set-role <username> <viewer|editor>
+user set-password <username>
+```
+
+- `--role` 기본값은 `viewer`
+- 비밀번호는 인자로 받지 않고 실행 후 표준 입력으로 수신. 셸 히스토리와 프로세스 목록 노출 방지
+- 비밀번호는 8자 이상. `set-password` 실행 시 해당 사용자의 유효한 refresh token 전부 폐기
+- 성공은 종료 코드 `0`, 실패는 `1`
+
+로컬:
+
+```powershell
+dotnet run --project FamilyGallery.Api -- user add dad --display-name "{이름}" --role editor
+```
+
+컨테이너 (비밀번호 입력을 위해 `-it` 필요):
+
+```bash
+docker compose exec -it api dotnet FamilyGallery.Api.dll user add dad --display-name "{이름}" --role editor
+```
 
 ## 설정
 
@@ -56,7 +83,7 @@ docker-compose.yml    NAS 배포용
 
 - SQLite. 스키마는 EF Core 마이그레이션으로 관리
 - 기동 시 마이그레이션 자동 적용. 단일 인스턴스 배포이므로 별도 적용 절차 없음
-- DB 파일의 상위 디렉터리는 기동 시 자동 생성. SQLite가 직접 만들지 않아 최초 실행이 실패하는 것을 막는다
+- DB 파일의 상위 디렉터리는 기동 시 자동 생성. (SQLite가 직접 만들지 않아 최초 실행이 실패하는 것을 막음)
 - `journal_mode`는 명시 설정하지 않음. EF Core가 생성하는 SQLite DB는 WAL이 기본값
 
 마이그레이션 추가:

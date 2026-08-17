@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using FamilyGallery.Api.Cli;
 using FamilyGallery.Api.Data;
 using FamilyGallery.Api.Endpoints;
 using FamilyGallery.Api.Options;
@@ -13,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -20,9 +22,18 @@ namespace FamilyGallery.Api;
 
 public class Program
 {
-    public static void Main(string[] args)
+    public static int Main(string[] args)
     {
-        var builder = WebApplication.CreateBuilder(args);
+        var isUserCommand = UserCommands.Matches(args);
+
+        // CLI 인자는 위치 인자를 포함해 구성 바인더가 파싱하지 못함. 해당 모드에서는 전달하지 않음.
+        var builder = WebApplication.CreateBuilder(isUserCommand ? [] : args);
+
+        if (isUserCommand)
+        {
+            // 마이그레이션 SQL 로그가 프롬프트를 가림. 결과와 오류는 표준 출력으로 직접 전달.
+            builder.Logging.ClearProviders();
+        }
 
         builder.Services.AddOptions<JwtOptions>()
             .BindConfiguration(JwtOptions.SectionName)
@@ -82,6 +93,11 @@ public class Program
 
         InitializeDatabase(app);
 
+        if (isUserCommand)
+        {
+            return UserCommands.Execute(app.Services, args);
+        }
+
         app.UseForwardedHeaders();
 
         if (app.Environment.IsDevelopment())
@@ -95,6 +111,8 @@ public class Program
         app.MapHealthEndpoints();
 
         app.Run();
+
+        return 0;
     }
 
     // 단일 인스턴스 배포. 기동 시점 마이그레이션 적용으로 충분.
