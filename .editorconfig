@@ -119,3 +119,8 @@ dotnet_naming_symbols.async_methods.applicable_kinds = method
 dotnet_naming_symbols.async_methods.required_modifiers = async
 dotnet_naming_style.async_style.capitalization = pascal_case
 dotnet_naming_style.async_style.required_suffix = Async
+
+# EF Core 생성 코드. 스타일 규칙 적용 시 마이그레이션 추가마다 수동 수정 필요.
+[**/Migrations/*.cs]
+generated_code = true
+csharp_style_namespace_declarations = file_scoped:none

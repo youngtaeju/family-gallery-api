@@ -17,11 +17,14 @@
 ## 프로젝트 구조
 
 ```
+.config/
+  dotnet-tools.json   로컬 도구 매니페스트 (dotnet-ef)
 FamilyGallery.slnx
 FamilyGallery.Api/
-  Program.cs          서비스 등록 / 파이프라인
+  Program.cs          서비스 등록 / 파이프라인 / DB 초기화
   Options/            JwtOptions, GalleryOptions
   Data/               AppDbContext, Entities
+  Migrations/         EF Core 마이그레이션
   Endpoints/          엔드포인트 매핑 확장 메서드
 Dockerfile
 docker-compose.yml    NAS 배포용
@@ -49,6 +52,22 @@ docker-compose.yml    NAS 배포용
 - `Jwt:SigningKey`는 설정 파일에 미포함. 운영은 환경변수 `Jwt__SigningKey`, 로컬은 user-secrets 사용
 - `ValidateOnStart` 적용. 필수 설정 누락 시 기동 단계에서 실패
 
+## 데이터베이스
+
+- SQLite. 스키마는 EF Core 마이그레이션으로 관리
+- 기동 시 마이그레이션 자동 적용. 단일 인스턴스 배포이므로 별도 적용 절차 없음
+- DB 파일의 상위 디렉터리는 기동 시 자동 생성. SQLite가 직접 만들지 않아 최초 실행이 실패하는 것을 막는다
+- `journal_mode`는 명시 설정하지 않음. EF Core가 생성하는 SQLite DB는 WAL이 기본값
+
+마이그레이션 추가:
+
+```powershell
+dotnet tool restore
+dotnet ef migrations add <이름> --project FamilyGallery.Api
+```
+
+`dotnet-ef`는 로컬 도구로 버전 고정. 전역 설치 불필요.
+
 ## 로컬 실행
 
 서명 키를 user-secrets에 등록 (최초 1회).
@@ -69,7 +88,7 @@ dotnet run --project FamilyGallery.Api
 - `http://localhost:5088/health` → `{"status":"ok","version":"..."}`
 - `http://localhost:5088/openapi/v1.json` (Development 전용)
 
-Development 환경 기본값은 `Gallery:RootPath` = `./.local/gallery`, SQLite = `./.local/family-gallery.db`. `.local/`은 git 제외 대상. 소스 폴더 `Data/`와 대소문자만 다른 `data/`는 Windows git이 함께 무시하므로 미사용.
+Development 환경 기본값은 `Gallery:RootPath` = `./.local/gallery`, SQLite = `./.local/family-gallery.db`. `.local/`은 git 제외 대상이며 기동 시 자동 생성된다. 소스 폴더 `Data/`와 대소문자만 다른 `data/`는 Windows git이 함께 무시하므로 미사용.
 
 ## 배포 (Synology NAS)
 

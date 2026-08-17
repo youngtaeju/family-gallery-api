@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Text;
 using FamilyGallery.Api.Data;
 using FamilyGallery.Api.Endpoints;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -78,6 +80,8 @@ public class Program
 
         var app = builder.Build();
 
+        InitializeDatabase(app);
+
         app.UseForwardedHeaders();
 
         if (app.Environment.IsDevelopment())
@@ -91,5 +95,40 @@ public class Program
         app.MapHealthEndpoints();
 
         app.Run();
+    }
+
+    // 단일 인스턴스 배포. 기동 시점 마이그레이션 적용으로 충분.
+    private static void InitializeDatabase(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        EnsureDataSourceDirectory(db.Database.GetConnectionString());
+
+        // journal_mode는 미설정. EF Core가 생성하는 SQLite DB는 WAL이 기본값.
+        db.Database.Migrate();
+    }
+
+    // SQLite는 상위 디렉터리를 만들지 않음. 최초 실행 시 연결 실패 방지.
+    private static void EnsureDataSourceDirectory(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return;
+        }
+
+        var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
+
+        if (string.IsNullOrWhiteSpace(dataSource))
+        {
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(Path.GetFullPath(dataSource));
+
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
     }
 }
