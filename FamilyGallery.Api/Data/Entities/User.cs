@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace FamilyGallery.Api.Data.Entities;
 
-// 모든 사용자가 동일한 viewer 권한. role 컬럼 없음.
 public class User
 {
     public int Id { get; set; }
@@ -13,6 +12,9 @@ public class User
     public required string PasswordHash { get; set; }
 
     public required string DisplayName { get; set; }
+
+    // 조회 범위는 권한과 무관하게 전원 동일. 쓰기 작업만 구분.
+    public UserRole Role { get; set; } = UserRole.Viewer;
 
     public DateTimeOffset CreatedAt { get; set; }
 

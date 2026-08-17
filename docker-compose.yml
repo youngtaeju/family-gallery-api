@@ -8,9 +8,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY 미설정}
     volumes:
-      # NAS 원본. 읽기 전용.
-      - /volume2/family-gallery:/data/gallery:ro
-      # SQLite 쓰기 영역. 원본 볼륨과 분리.
+      # NAS 원본. 업로드 스테이징(.uploads/)과 휴지통(.trash/)이 같은 마운트 안에 있어야 원자적 rename 가능.
+      - /volume2/family-gallery:/data/gallery
+      # SQLite / 썸네일 캐시 영역. 원본 볼륨과 분리.
       - /volume2/docker/family-gallery-api/data:/data/app
     ports:
       # 외부 노출은 Cloudflare Tunnel 단일 경로. 호스트 loopback으로만 바인딩.

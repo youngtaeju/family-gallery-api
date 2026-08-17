@@ -17,6 +17,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(u => u.Username).HasMaxLength(64);
             entity.Property(u => u.PasswordHash).HasMaxLength(256);
             entity.Property(u => u.DisplayName).HasMaxLength(64);
+
+            // DB 직접 조회 시 가독성 확보. enum 값 재배치에도 안전.
+            entity.Property(u => u.Role).HasConversion<string>().HasMaxLength(16);
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>

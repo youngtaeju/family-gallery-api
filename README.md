@@ -1,11 +1,13 @@
 # family-gallery-api
 
-가정용 시놀로지 NAS의 이미지·영상을 가족 구성원에게만 제공하는 읽기 전용 API.
+가정용 시놀로지 NAS의 이미지·영상을 가족 구성원에게만 제공하는 API.
 
-- NAS 원본은 읽기 전용 접근. 쓰기·삭제 경로 없음
+- 조회는 로그인한 사용자 전원, 업로드·삭제는 `editor` 권한 계정만
+- 원본 수정 경로 없음. 쓰기는 신규 추가와 삭제뿐이며 삭제는 휴지통 이동으로 처리
 - 외부 노출은 Cloudflare Tunnel 단일 경로
 - 클라이언트는 Flutter 앱(`family-gallery-app`) 단독
-- 모든 사용자 동일한 `viewer` 권한. 역할 구분 없음
+
+설계 전반은 [CLAUDE.md](./CLAUDE.md) 참조. 아래는 현재 구현된 범위만 다룬다.
 
 ## 요구 사항
 
@@ -30,6 +32,7 @@ docker-compose.yml    NAS 배포용
 - JWT Bearer 스킴. issuer / audience / 만료 / 서명 키 전부 검증
 - 인가 fallback policy 적용. 전 엔드포인트 인증 필수가 기본값
 - 익명 허용은 `/health`, 개발용 OpenAPI 문서뿐
+- 권한은 `User.Role`의 `Viewer` / `Editor` 2종. 조회 범위는 권한과 무관하게 동일하고, 업로드·삭제만 `Editor`로 제한
 
 ## 설정
 
@@ -41,7 +44,7 @@ docker-compose.yml    NAS 배포용
 | `Jwt:SigningKey` | HMAC 서명 키 (32자 이상) | **없음. 반드시 외부 주입** |
 | `Jwt:AccessTokenMinutes` | access token 유효 시간(분) | `30` |
 | `Jwt:RefreshTokenDays` | refresh token 유효 기간(일) | `60` |
-| `Gallery:RootPath` | NAS 마운트 경로 (읽기 전용) | `/data/gallery` |
+| `Gallery:RootPath` | NAS 마운트 경로 (읽기·쓰기) | `/data/gallery` |
 
 - `Jwt:SigningKey`는 설정 파일에 미포함. 운영은 환경변수 `Jwt__SigningKey`, 로컬은 user-secrets 사용
 - `ValidateOnStart` 적용. 필수 설정 누락 시 기동 단계에서 실패
@@ -82,10 +85,10 @@ docker compose up -d --build
 
 마운트:
 
-- `/volume2/family-gallery` → `/data/gallery` (읽기 전용, 원본)
-- `/volume2/docker/family-gallery-api/data` → `/data/app` (SQLite 쓰기 영역)
+- `/volume2/family-gallery` → `/data/gallery` (원본, 읽기·쓰기)
+- `/volume2/docker/family-gallery-api/data` → `/data/app` (SQLite / 썸네일 캐시 영역)
 
-- 컨테이너는 비root 계정(uid 1654)으로 동작. `/data/app`에 해당 uid의 쓰기 권한 필요
+- 컨테이너는 비root 계정(uid 1654)으로 동작. 두 마운트 모두 해당 uid의 쓰기 권한 필요
 - 외부 노출은 Cloudflare Tunnel 단일 경로. 컨테이너 포트는 호스트 loopback에만 바인딩
 
 ## 라이선스
