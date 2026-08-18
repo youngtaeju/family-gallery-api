@@ -17,6 +17,8 @@ namespace FamilyGallery.Api.Endpoints;
 
 public static class AuthEndpoints
 {
+    public const string RateLimitPolicy = "auth";
+
     // 계정 부재 시에도 동일한 검증 비용 유지. 앱 시작 시 1회 계산.
     private static readonly string DummyPasswordHash = BCrypt.Net.BCrypt.HashPassword("family-gallery");
 
@@ -28,8 +30,9 @@ public static class AuthEndpoints
     {
         var group = app.MapGroup("/auth");
 
-        group.MapPost("/login", LoginAsync).AllowAnonymous().WithName("Login");
-        group.MapPost("/refresh", RefreshAsync).AllowAnonymous().WithName("Refresh");
+        // 익명 호출이 가능한 두 경로만 rate limit 대상.
+        group.MapPost("/login", LoginAsync).AllowAnonymous().RequireRateLimiting(RateLimitPolicy).WithName("Login");
+        group.MapPost("/refresh", RefreshAsync).AllowAnonymous().RequireRateLimiting(RateLimitPolicy).WithName("Refresh");
         group.MapPost("/logout", LogoutAsync).WithName("Logout");
         group.MapGet("/me", GetMeAsync).WithName("Me");
 

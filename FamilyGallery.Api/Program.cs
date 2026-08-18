@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading.RateLimiting;
 using FamilyGallery.Api.Cli;
 using FamilyGallery.Api.Data;
 using FamilyGallery.Api.Endpoints;
@@ -9,7 +11,9 @@ using FamilyGallery.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +27,11 @@ namespace FamilyGallery.Api;
 
 public class Program
 {
+    // 가족 단위 사용량 기준. 정상 사용자의 재시도는 허용하고 무차별 대입만 차단.
+    private const int AuthRequestsPerWindow = 20;
+
+    private static readonly TimeSpan AuthRateLimitWindow = TimeSpan.FromMinutes(1);
+
     public static int Main(string[] args)
     {
         var isUserCommand = UserCommands.Matches(args);
@@ -95,6 +104,34 @@ public class Program
                 .Build();
         });
 
+        builder.Services.AddRateLimiter(options =>
+        {
+            // 인증 없이 반복 호출 가능한 경로만 대상. 인증 필요 경로는 토큰 자체가 관문.
+            options.AddPolicy(AuthEndpoints.RateLimitPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientKey(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = AuthRequestsPerWindow,
+                        Window = AuthRateLimitWindow,
+                        QueueLimit = 0
+                    }));
+
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        ((int)retryAfter.TotalSeconds).ToString(CultureInfo.InvariantCulture);
+                }
+
+                await Results
+                    .Problem(detail: "요청이 너무 잦습니다. 잠시 후 다시 시도하세요.",
+                        statusCode: StatusCodes.Status429TooManyRequests)
+                    .ExecuteAsync(context.HttpContext);
+            };
+        });
+
         builder.Services.AddOpenApi();
 
         var app = builder.Build();
@@ -113,6 +150,8 @@ public class Program
             app.MapOpenApi().AllowAnonymous();
         }
 
+        app.UseRateLimiter();
+
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -122,6 +161,20 @@ public class Program
         app.Run();
 
         return 0;
+    }
+
+    // KnownProxies 미지정으로 X-Forwarded-For는 클라이언트가 위조 가능.
+    // Tunnel 경유 트래픽에서 Cloudflare가 항상 덮어쓰는 헤더를 우선 사용.
+    private static string GetClientKey(HttpContext context)
+    {
+        var cloudflareIp = context.Request.Headers["CF-Connecting-IP"].ToString();
+
+        if (!string.IsNullOrWhiteSpace(cloudflareIp))
+        {
+            return cloudflareIp;
+        }
+
+        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
     // 단일 인스턴스 배포. 기동 시점 마이그레이션 적용으로 충분.

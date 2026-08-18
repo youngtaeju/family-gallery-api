@@ -45,6 +45,7 @@ docker-compose.yml    NAS 배포용
 | `POST /auth/logout` | 필요 | 제시한 refresh token 폐기 |
 | `GET /auth/me` | 필요 | 현재 사용자 정보 (DB 조회) |
 
+- `POST /auth/login`과 `POST /auth/refresh`는 요청 빈도 제한. 초과 시 `429`와 `Retry-After` 헤더 반환
 - refresh token은 원문 미저장. SHA-256 해시로 대조하고 사용 시 회전 발급
 - 폐기된 refresh token이 다시 제시되면 탈취로 간주해 해당 사용자의 유효한 세션 전부 차단
 - 로그인 실패는 계정 존재 여부와 무관하게 동일 응답. 계정 부재 시에도 해시 검증을 수행해 응답 시간 차이 제거
@@ -54,6 +55,14 @@ docker-compose.yml    NAS 배포용
 - `user add`로 만든 계정은 즉시 로그인 가능
 - `user set-role` / `user set-password`는 **이미 발급된 access token에 반영되지 않음**. 최대 `Jwt:AccessTokenMinutes`(기본 30분) 경과 또는 refresh 시점에 반영
 - `GET /auth/me`는 DB를 조회하므로 즉시 반영. 인가 판정은 클레임 기준이라 지연
+
+### 요청 빈도 제한
+
+- 인증 없이 반복 호출 가능한 `POST /auth/login`, `POST /auth/refresh`만 대상. 나머지는 토큰 자체가 관문
+- IP당 1분에 20회. 가족 단위 사용량 기준이며 정상적인 재시도는 허용하고 무차별 대입만 차단
+- 집계 기준 IP는 `CF-Connecting-IP` 헤더 우선, 없으면 연결 원격 주소
+  - `X-Forwarded-For`는 `KnownProxies`를 비워둔 구성상 클라이언트가 위조할 수 있어 사용하지 않음
+  - `CF-Connecting-IP`는 Cloudflare가 항상 덮어쓰므로 Tunnel 단일 경로 전제에서 신뢰 가능
 
 ## 사용자 관리
 
