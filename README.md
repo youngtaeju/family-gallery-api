@@ -24,6 +24,7 @@ FamilyGallery.Api/
   Data/               AppDbContext, Entities
   Migrations/         EF Core 마이그레이션
   Endpoints/          엔드포인트 매핑 확장 메서드
+  Services/           토큰 발급
   Cli/                계정 관리 명령
 Dockerfile
 docker-compose.yml    NAS 배포용
@@ -35,6 +36,24 @@ docker-compose.yml    NAS 배포용
 - 인가 fallback policy 적용. 전 엔드포인트 인증 필수가 기본값
 - 익명 허용은 `/health`, 개발용 OpenAPI 문서뿐
 - 권한은 `User.Role`의 `Viewer` / `Editor` 2종. 조회 범위는 권한과 무관하게 동일하고, 업로드·삭제만 `Editor`로 제한
+- 클레임은 `sub` / `name` / `role` / `jti`. 인바운드 클레임 매핑 비활성화로 발급·검증 이름 일치
+
+| 엔드포인트 | 인증 | 설명 |
+| --- | --- | --- |
+| `POST /auth/login` | 익명 | 자격 증명 검증 후 토큰 쌍 + 사용자 정보 반환 |
+| `POST /auth/refresh` | 익명 | refresh token 회전 발급 |
+| `POST /auth/logout` | 필요 | 제시한 refresh token 폐기 |
+| `GET /auth/me` | 필요 | 현재 사용자 정보 (DB 조회) |
+
+- refresh token은 원문 미저장. SHA-256 해시로 대조하고 사용 시 회전 발급
+- 폐기된 refresh token이 다시 제시되면 탈취로 간주해 해당 사용자의 유효한 세션 전부 차단
+- 로그인 실패는 계정 존재 여부와 무관하게 동일 응답. 계정 부재 시에도 해시 검증을 수행해 응답 시간 차이 제거
+
+권한 변경 반영 시점에 주의. access token은 자체 완결적이라 매 요청마다 DB를 조회하지 않음.
+
+- `user add`로 만든 계정은 즉시 로그인 가능
+- `user set-role` / `user set-password`는 **이미 발급된 access token에 반영되지 않음**. 최대 `Jwt:AccessTokenMinutes`(기본 30분) 경과 또는 refresh 시점에 반영
+- `GET /auth/me`는 DB를 조회하므로 즉시 반영. 인가 판정은 클레임 기준이라 지연
 
 ## 사용자 관리
 

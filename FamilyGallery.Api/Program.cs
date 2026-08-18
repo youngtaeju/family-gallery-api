@@ -5,6 +5,7 @@ using FamilyGallery.Api.Cli;
 using FamilyGallery.Api.Data;
 using FamilyGallery.Api.Endpoints;
 using FamilyGallery.Api.Options;
+using FamilyGallery.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -48,6 +49,8 @@ public class Program
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
+        builder.Services.AddSingleton<TokenService>();
+
         // TLS 종료는 Cloudflare Tunnel 담당. 컨테이너는 평문 HTTP만 수신하므로 HTTPS 리디렉션 없음.
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
         {
@@ -66,6 +69,9 @@ public class Program
             {
                 var jwt = jwtOptions.Value;
 
+                // 기본 인바운드 매핑으로 sub, role 클레임명이 WS-* URI로 변환되는 문제 방지
+                bearer.MapInboundClaims = false;
+
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
@@ -75,7 +81,9 @@ public class Program
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
-                    ClockSkew = TimeSpan.FromSeconds(30)
+                    ClockSkew = TimeSpan.FromSeconds(30),
+                    NameClaimType = TokenService.NameClaimType,
+                    RoleClaimType = TokenService.RoleClaimType
                 };
             });
 
@@ -109,6 +117,7 @@ public class Program
         app.UseAuthorization();
 
         app.MapHealthEndpoints();
+        app.MapAuthEndpoints();
 
         app.Run();
 
