@@ -21,7 +21,7 @@ namespace FamilyGallery.Api.Migrations
                     PasswordHash = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
                     DisplayName = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     Role = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -36,9 +36,9 @@ namespace FamilyGallery.Api.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     UserId = table.Column<int>(type: "INTEGER", nullable: false),
                     TokenHash = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    RevokedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    RevokedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {

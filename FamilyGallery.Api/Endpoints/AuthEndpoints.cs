@@ -91,7 +91,7 @@ public static class AuthEndpoints
             return Unauthorized(InvalidRefreshTokenMessage);
         }
 
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
 
         if (stored.RevokedAt is not null)
         {
@@ -117,6 +117,10 @@ public static class AuthEndpoints
         stored.RevokedAt = now;
 
         var refreshToken = IssueRefreshToken(db, tokens, stored.UserId);
+
+        // 만료 토큰 누적 방지.
+        db.RefreshTokens.RemoveRange(
+            db.RefreshTokens.Where(t => t.UserId == stored.UserId && t.ExpiresAt < now));
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -147,7 +151,7 @@ public static class AuthEndpoints
 
             if (stored is not null && stored.RevokedAt is null)
             {
-                stored.RevokedAt = DateTimeOffset.UtcNow;
+                stored.RevokedAt = DateTime.UtcNow;
                 await db.SaveChangesAsync(cancellationToken);
             }
         }
@@ -186,7 +190,7 @@ public static class AuthEndpoints
             UserId = userId,
             TokenHash = pair.Hash,
             ExpiresAt = pair.ExpiresAt,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow
         });
 
         return pair;

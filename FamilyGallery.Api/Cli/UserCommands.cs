@@ -112,7 +112,7 @@ public static class UserCommands
             DisplayName = displayName,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
             Role = role,
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTime.UtcNow
         });
 
         db.SaveChanges();
@@ -169,7 +169,7 @@ public static class UserCommands
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
         // 비밀번호 변경 시 기존 세션 무효화.
-        var now = DateTimeOffset.UtcNow;
+        var now = DateTime.UtcNow;
 
         foreach (var token in db.RefreshTokens.Where(t => t.UserId == user.Id && t.RevokedAt == null))
         {

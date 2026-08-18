@@ -21,7 +21,7 @@ FamilyGallery.slnx
 FamilyGallery.Api/
   Program.cs          서비스 등록 / 파이프라인 / DB 초기화
   Options/            JwtOptions, GalleryOptions
-  Data/               AppDbContext, Entities
+  Data/               AppDbContext, Entities, 값 변환기
   Migrations/         EF Core 마이그레이션
   Endpoints/          엔드포인트 매핑 확장 메서드
   Services/           토큰 발급
@@ -104,6 +104,13 @@ docker compose exec -it api dotnet FamilyGallery.Api.dll user add dad --display-
 - 기동 시 마이그레이션 자동 적용. 단일 인스턴스 배포이므로 별도 적용 절차 없음
 - DB 파일의 상위 디렉터리는 기동 시 자동 생성. (SQLite가 직접 만들지 않아 최초 실행이 실패하는 것을 막음)
 - `journal_mode`는 명시 설정하지 않음. EF Core가 생성하는 SQLite DB는 WAL이 기본값
+
+### 시각 값
+
+- 시각 값은 모두 UTC 기준 `DateTime`으로 저장·조회
+- SQLite의 `DateTimeOffset` 쿼리 제약을 피하기 위해 `DateTimeOffset`은 사용하지 않음
+- SQLite 조회 시 사라지는 UTC `Kind`는 `UtcDateTimeConverter`에서 복원
+- 모든 `DateTime` 속성에 공통 적용되어 JSON 응답의 UTC 표기(`Z`)를 일관되게 유지
 
 마이그레이션 추가:
 

@@ -67,7 +67,7 @@ public sealed class TokenService
         return new RefreshTokenPair(
             token,
             HashRefreshToken(token),
-            DateTimeOffset.UtcNow.AddDays(_options.RefreshTokenDays));
+            DateTime.UtcNow.AddDays(_options.RefreshTokenDays));
     }
 
     // 원문 엔트로피가 128비트 이상. 사전 공격 대상이 아니므로 단순 해시로 충분.
@@ -77,4 +77,4 @@ public sealed class TokenService
     }
 }
 
-public sealed record RefreshTokenPair(string Token, string Hash, DateTimeOffset ExpiresAt);
+public sealed record RefreshTokenPair(string Token, string Hash, DateTime ExpiresAt);
