@@ -17,6 +17,7 @@
 ```
 .config/
   dotnet-tools.json   로컬 도구 매니페스트 (dotnet-ef)
+global.json           dotnet test 러너 지정
 FamilyGallery.slnx
 FamilyGallery.Api/
   Program.cs          서비스 등록 / 파이프라인 / DB 초기화
@@ -26,6 +27,9 @@ FamilyGallery.Api/
   Endpoints/          엔드포인트 매핑 확장 메서드
   Services/           토큰 발급
   Cli/                계정 관리 명령
+FamilyGallery.Api.Tests/
+  ApiFactory.cs       테스트용 호스트 / 임시 DB
+  *Tests.cs           통합 테스트
 Dockerfile
 docker-compose.yml    NAS 배포용
 ```
@@ -151,6 +155,17 @@ dotnet run --project FamilyGallery.Api
 - `http://localhost:5088/openapi/v1.json` (Development 전용)
 
 Development 환경 기본값은 `Gallery:RootPath` = `./.local/gallery`, SQLite = `./.local/family-gallery.db`. `.local/`은 git 제외 대상이며 기동 시 자동 생성된다. 소스 폴더 `Data/`와 대소문자만 다른 `data/`는 Windows git이 함께 무시하므로 미사용.
+
+## 테스트
+
+```powershell
+dotnet test --solution FamilyGallery.slnx
+```
+
+- xUnit v3 기반 통합 테스트. `WebApplicationFactory`로 테스트 호스트를 띄워 실제 HTTP 파이프라인 검증
+- 테스트 클래스마다 임시 파일 SQLite를 생성하고 마이그레이션까지 적용. DB와 요청 빈도 제한 상태가 클래스 간에 섞이지 않음
+- xUnit v3의 Microsoft.Testing.Platform 지원을 사용하며, `dotnet test`도 같은 러너를 사용하도록 `global.json`에서 지정
+- 테스트 프로젝트는 `Dockerfile`의 게시 대상이 아니므로 배포 이미지에 포함되지 않음
 
 ## 배포 (Synology NAS)
 
