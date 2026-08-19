@@ -182,10 +182,13 @@ docker compose up -d --build
 마운트:
 
 - `/volume2/family-gallery` → `/data/gallery` (원본, 읽기·쓰기)
-- `/volume2/docker/family-gallery-api/data` → `/data/app` (SQLite / 썸네일 캐시 영역)
+- `/volume2/docker/family-gallery-api/data` → `/data/app` (SQLite DB 및 썸네일 캐시)
 
-- 컨테이너는 비root 계정(uid 1654)으로 동작. 두 마운트 모두 해당 uid의 쓰기 권한 필요
-- 외부 노출은 Cloudflare Tunnel 단일 경로. 컨테이너 포트는 호스트 loopback에만 바인딩
+- 컨테이너는 비root 계정(uid 1654)으로 실행되며, 두 마운트 경로 모두 해당 uid에 대한 쓰기 권한이 필요
+  - 이미지에 `/data/app`, `/data/gallery` 디렉터리를 미리 생성하므로 named volume은 해당 uid 소유로 초기화됨
+  - bind mount는 호스트 디렉터리의 권한이 우선하므로 DSM에서 별도 권한 설정 필요
+  - 쓰기 권한이 없으면 기동 단계에서 `SQLite 데이터베이스에 쓸 수 없습니다` 오류로 중단
+- 외부 노출은 Cloudflare Tunnel 단일 경로로 구성하며, 컨테이너 포트는 호스트 loopback에만 바인딩
 
 ## 라이선스
 
