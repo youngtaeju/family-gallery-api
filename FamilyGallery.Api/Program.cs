@@ -177,38 +177,55 @@ public class Program
         return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 
-    // 단일 인스턴스 배포. 기동 시점 마이그레이션 적용으로 충분.
+    // 단일 인스턴스 배포 환경이므로 기동 시 DB 초기화 및 마이그레이션을 적용
     private static void InitializeDatabase(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        EnsureDataSourceDirectory(db.Database.GetConnectionString());
+        var dataSource = EnsureDataSourceDirectory(db.Database.GetConnectionString());
 
-        // journal_mode는 미설정. EF Core가 생성하는 SQLite DB는 WAL이 기본값.
-        db.Database.Migrate();
+        try
+        {
+            // SQLite DB는 EF Core 기본 설정인 WAL 모드 사용
+            db.Database.Migrate();
+        }
+        catch (SqliteException ex)
+            when (ex.SqliteErrorCode is SQLitePCL.raw.SQLITE_CANTOPEN or SQLitePCL.raw.SQLITE_READONLY)
+        {
+            // DB 파일 생성 또는 갱신에 필요한 쓰기 권한이 없는 경우 명확한 오류로 변환.
+            // 파일 생성 단계면 CantOpen, 기존 파일 갱신 단계면 ReadOnly
+            throw new InvalidOperationException(
+                $"SQLite 데이터베이스에 쓸 수 없습니다: {dataSource}. " +
+                "컨테이너 실행 계정에 해당 경로의 쓰기 권한이 있는지 확인하세요.",
+                ex);
+        }
     }
 
     // SQLite는 상위 디렉터리를 만들지 않음. 최초 실행 시 연결 실패 방지.
-    private static void EnsureDataSourceDirectory(string? connectionString)
+    // 반환값은 오류 메시지에 사용할 데이터 파일 절대 경로.
+    private static string? EnsureDataSourceDirectory(string? connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            return;
+            return null;
         }
 
         var dataSource = new SqliteConnectionStringBuilder(connectionString).DataSource;
 
         if (string.IsNullOrWhiteSpace(dataSource))
         {
-            return;
+            return null;
         }
 
-        var directory = Path.GetDirectoryName(Path.GetFullPath(dataSource));
+        var fullPath = Path.GetFullPath(dataSource);
+        var directory = Path.GetDirectoryName(fullPath);
 
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
         }
+
+        return fullPath;
     }
 }
