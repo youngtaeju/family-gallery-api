@@ -1,3 +1,4 @@
+using System;
 using FamilyGallery.Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
+    // 엔티티 추가 시 개별 지정 없이 모든 DateTime 속성에 적용.
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
