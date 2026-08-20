@@ -1,15 +1,20 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using FamilyGallery.Api;
 using FamilyGallery.Api.Data;
 using FamilyGallery.Api.Data.Entities;
+using FamilyGallery.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace FamilyGallery.Api.Tests;
 
@@ -23,10 +28,26 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     private readonly string _databasePath;
 
+    // 스캔 대상과 SQLite 파일을 분리. 스캐너 순회에 DB 파일이 섞이지 않음.
+    public string GalleryPath { get; }
+
+    private readonly string? _timeZone;
+
+    // xUnit의 IClassFixture는 무인자 생성자만 활성화 가능. 선택적 매개변수로는 대체되지 않음.
     public ApiFactory()
+        : this(null)
     {
+    }
+
+    // 촬영일시 해석 검증은 구성값에 좌우되면 안 됨. 필요한 테스트만 표준시를 명시.
+    // IClassFixture는 public 생성자가 하나뿐이어야 하므로 internal로 노출.
+    internal ApiFactory(string? timeZone)
+    {
+        _timeZone = timeZone;
+
         _rootPath = Path.Combine(Path.GetTempPath(), $"fg-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_rootPath);
+        GalleryPath = Path.Combine(_rootPath, "gallery");
+        Directory.CreateDirectory(GalleryPath);
         _databasePath = Path.Combine(_rootPath, "test.db");
 
         // Services 접근 시 호스트가 생성되며 ConfigureWebHost가 적용됨.
@@ -56,14 +77,66 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         // appsettings.Development.json의 .local 경로를 타지 않도록 별도 환경 사용.
         builder.UseEnvironment("Testing");
 
+        var overrides = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:Default"] = $"Data Source={_databasePath}",
+            ["Jwt:SigningKey"] = SigningKey,
+            ["Gallery:RootPath"] = GalleryPath
+        };
+
+        // 시간대 지정 시에만 기본 설정 덮어씀.
+        if (_timeZone is not null)
+        {
+            overrides["Indexing:TimeZone"] = _timeZone;
+        }
+
         // 기존 구성 소스 뒤에 추가되어 우선 적용.
-        builder.ConfigureAppConfiguration((_, config) =>
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(overrides));
+
+        // 주기 스캔이 테스트의 파일 조작과 경합. 스캔 시점은 테스트가 직접 정함.
+        builder.ConfigureTestServices(services =>
+            services.Remove(services.Single(descriptor =>
+                descriptor.ServiceType == typeof(IHostedService)
+                && descriptor.ImplementationType == typeof(MediaIndexingService))));
+    }
+
+    // 목록·페이징 검증용. 인덱싱을 거치지 않고 정렬 키만 지정해 직접 등록.
+    public async Task<IReadOnlyList<int>> AddMediaAsync(params (string RelativePath, DateTime CapturedAt)[] items)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var added = new List<MediaItem>();
+
+        foreach (var (relativePath, capturedAt) in items)
+        {
+            var item = new MediaItem
             {
-                ["ConnectionStrings:Default"] = $"Data Source={_databasePath}",
-                ["Jwt:SigningKey"] = SigningKey,
-                ["Gallery:RootPath"] = _rootPath
-            }));
+                RelativePath = relativePath,
+                OriginalFileName = Path.GetFileName(relativePath),
+                ContentHash = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
+                MediaType = MediaType.Image,
+                FileSize = 1024,
+                CapturedAt = capturedAt,
+                FileModifiedAt = capturedAt,
+                IndexedAt = DateTime.UtcNow
+            };
+
+            db.MediaItems.Add(item);
+            added.Add(item);
+        }
+
+        await db.SaveChangesAsync();
+
+        return added.Select(item => item.Id).ToList();
+    }
+
+    // 인덱싱 동작 검증은 백그라운드 주기가 아닌 명시적 1회 실행으로 수행.
+    public async Task<MediaScanResult> ScanAsync()
+    {
+        using var scope = Services.CreateScope();
+
+        return await scope.ServiceProvider.GetRequiredService<MediaScanner>().ScanAsync(CancellationToken.None);
     }
 
     protected override void Dispose(bool disposing)
