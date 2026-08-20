@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Text;
@@ -170,6 +170,7 @@ public class Program
 
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
+        app.MapMediaEndpoints();
 
         app.Run();
 
