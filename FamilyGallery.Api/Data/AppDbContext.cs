@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
+    public DbSet<MediaItem> MediaItems => Set<MediaItem>();
+
     // 엔티티 추가 시 개별 지정 없이 모든 DateTime 속성에 적용.
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -38,6 +40,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany(u => u.RefreshTokens)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MediaItem>(entity =>
+        {
+            // 스캐너의 파일 단위 조회 키.
+            entity.HasIndex(m => m.RelativePath).IsUnique();
+
+            // 중복 제거 판정 키. 동일 내용의 재등록을 DB 제약으로 차단.
+            entity.HasIndex(m => m.ContentHash).IsUnique();
+
+            // 목록 정렬·커서 페이징 전용. ORDER BY와 방향을 일치시켜 정렬 단계 제거.
+            entity.HasIndex(m => new { m.CapturedAt, m.Id }).IsDescending();
+
+            entity.Property(m => m.RelativePath).HasMaxLength(1024);
+            entity.Property(m => m.OriginalFileName).HasMaxLength(256);
+
+            // SHA-256 hex 고정 길이.
+            entity.Property(m => m.ContentHash).HasMaxLength(64);
+
+            entity.Property(m => m.MediaType).HasConversion<string>().HasMaxLength(16);
         });
     }
 }

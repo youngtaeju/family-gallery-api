@@ -55,10 +55,17 @@ public class Program
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        builder.Services.AddOptions<IndexingOptions>()
+            .BindConfiguration(IndexingOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
         builder.Services.AddSingleton<TokenService>();
+        builder.Services.AddSingleton<MediaMetadataReader>();
+        builder.Services.AddScoped<MediaScanner>();
 
         // TLS 종료는 Cloudflare Tunnel 담당. 컨테이너는 평문 HTTP만 수신하므로 HTTPS 리디렉션 없음.
         builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -132,6 +139,12 @@ public class Program
             };
         });
 
+        // CLI 모드는 명령 실행 후 즉시 종료. 주기 스캔을 띄우지 않음.
+        if (!isUserCommand)
+        {
+            builder.Services.AddHostedService<MediaIndexingService>();
+        }
+
         builder.Services.AddOpenApi();
 
         var app = builder.Build();
@@ -157,6 +170,7 @@ public class Program
 
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
+        app.MapMediaEndpoints();
 
         app.Run();
 
